@@ -13,27 +13,40 @@ def get_db_connection():
     """Get a database connection from the pool"""
     global _connection_pool
     
-    if _connection_pool is None:
-        # Get Supabase connection string from environment
-        database_url = os.environ.get('DATABASE_URL')
-        
-        if not database_url:
-            raise Exception("DATABASE_URL environment variable is not set")
-        
-        # Create connection pool
-        _connection_pool = psycopg2.pool.SimpleConnectionPool(
-            1,  # min connections
-            10,  # max connections
-            database_url
+    # Get Supabase connection string from environment
+    database_url = os.environ.get('DATABASE_URL')
+    
+    if not database_url:
+        raise Exception(
+            "DATABASE_URL environment variable is not set. "
+            "Please set it in Vercel Dashboard → Settings → Environment Variables. "
+            "Get your connection string from Supabase Dashboard → Settings → Database → Connection string (URI)"
         )
     
-    return _connection_pool.getconn()
+    # Create connection pool if it doesn't exist
+    if _connection_pool is None:
+        try:
+            _connection_pool = psycopg2.pool.SimpleConnectionPool(
+                1,  # min connections
+                10,  # max connections
+                database_url
+            )
+        except Exception as e:
+            raise Exception(f"Failed to connect to database: {str(e)}. Please check your DATABASE_URL.")
+    
+    try:
+        return _connection_pool.getconn()
+    except Exception as e:
+        raise Exception(f"Failed to get database connection: {str(e)}")
 
 def return_db_connection(conn):
     """Return a connection to the pool"""
     global _connection_pool
-    if _connection_pool:
-        _connection_pool.putconn(conn)
+    if _connection_pool and conn:
+        try:
+            _connection_pool.putconn(conn)
+        except Exception as e:
+            print(f"Warning: Error returning connection to pool: {e}")
 
 def get_db():
     """Get a database cursor with dict-like rows"""

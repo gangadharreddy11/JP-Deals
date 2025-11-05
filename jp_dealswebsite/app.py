@@ -82,9 +82,13 @@ def ensure_db_initialized():
             _db_initialized = True
         except Exception as e:
             # If tables already exist, that's fine
-            if 'already exists' not in str(e).lower():
+            error_msg = str(e).lower()
+            if 'already exists' in error_msg or 'duplicate' in error_msg:
+                _db_initialized = True
+            else:
+                # Log but don't fail - let the actual query handle it
                 print(f"Warning: Database initialization: {e}")
-            _db_initialized = True
+                _db_initialized = True
 
 def allowed_file(filename: str) -> bool:
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
@@ -100,91 +104,131 @@ def admin_required(f):
 
 def get_deal_of_the_day():
     """Get current deal of the day"""
-    ensure_db_initialized()
-    conn, cur = get_db()
-    
     try:
-        today = time.strftime('%Y-%m-%d')
+        ensure_db_initialized()
+        conn, cur = get_db()
         
-        cur.execute("""
-            SELECT d.*, c.name AS category_name, c.slug AS category_slug
-            FROM deal_of_the_day dotd
-            JOIN deals d ON d.id = dotd.deal_id
-            LEFT JOIN categories c ON c.id = d.category_id
-            WHERE dotd.is_active = true 
-            AND (dotd.end_date IS NULL OR dotd.end_date >= %s)
-            AND d.is_active = true
-            ORDER BY dotd.created_at DESC
-            LIMIT 1
-        """, (today,))
-        
-        deal = cur.fetchone()
-        return deal
-    finally:
-        cur.close()
-        return_db_connection(conn)
+        try:
+            today = time.strftime('%Y-%m-%d')
+            
+            cur.execute("""
+                SELECT d.*, c.name AS category_name, c.slug AS category_slug
+                FROM deal_of_the_day dotd
+                JOIN deals d ON d.id = dotd.deal_id
+                LEFT JOIN categories c ON c.id = d.category_id
+                WHERE dotd.is_active = true 
+                AND (dotd.end_date IS NULL OR dotd.end_date >= %s)
+                AND d.is_active = true
+                ORDER BY dotd.created_at DESC
+                LIMIT 1
+            """, (today,))
+            
+            deal = cur.fetchone()
+            return deal
+        finally:
+            cur.close()
+            return_db_connection(conn)
+    except Exception as e:
+        print(f"Error getting deal of the day: {e}")
+        return None
 
 @app.route('/')
 def home():
-    ensure_db_initialized()
-    conn, cur = get_db()
-    
     try:
-        # Get query parameters
-        search = request.args.get('search', '').strip()
-        sort_by = request.args.get('sort_by', 'newest')
-        max_price = request.args.get('max_price', '')
+        ensure_db_initialized()
+        conn, cur = get_db()
         
-        # Build base query
-        base_query = """
-            SELECT d.*, c.name AS category_name, c.slug AS category_slug
-            FROM deals d
-            LEFT JOIN categories c ON c.id = d.category_id
-        """
-        
-        # Build WHERE conditions
-        where_conditions = []
-        params = []
-        
-        if search:
-            where_conditions.append("d.title LIKE %s")
-            params.append(f"%{search}%")
-        
-        if max_price and max_price.isdigit():
-            where_conditions.append("d.price <= %s")
-            params.append(float(max_price))
-        
-        # Build ORDER BY clause
-        order_by = "ORDER BY "
-        if sort_by == 'discount':
-            order_by += "d.discount DESC NULLS LAST, d.created_at DESC"
-        elif sort_by == 'price-low':
-            order_by += "d.price ASC, d.created_at DESC"
-        elif sort_by == 'price-high':
-            order_by += "d.price DESC, d.created_at DESC"
-        else:  # newest
-            order_by += "d.created_at DESC, d.id DESC"
-        
-        # Combine query
-        if where_conditions:
-            query = base_query + " WHERE " + " AND ".join(where_conditions) + " " + order_by
+        try:
+            # Get query parameters
+            search = request.args.get('search', '').strip()
+            sort_by = request.args.get('sort_by', 'newest')
+            max_price = request.args.get('max_price', '')
+            
+            # Build base query
+            base_query = """
+                SELECT d.*, c.name AS category_name, c.slug AS category_slug
+                FROM deals d
+                LEFT JOIN categories c ON c.id = d.category_id
+            """
+            
+            # Build WHERE conditions
+            where_conditions = []
+            params = []
+            
+            if search:
+                where_conditions.append("d.title LIKE %s")
+                params.append(f"%{search}%")
+            
+            if max_price and max_price.isdigit():
+                where_conditions.append("d.price <= %s")
+                params.append(float(max_price))
+            
+            # Build ORDER BY clause
+            order_by = "ORDER BY "
+            if sort_by == 'discount':
+                order_by += "d.discount DESC NULLS LAST, d.created_at DESC"
+            elif sort_by == 'price-low':
+                order_by += "d.price ASC, d.created_at DESC"
+            elif sort_by == 'price-high':
+                order_by += "d.price DESC, d.created_at DESC"
+            else:  # newest
+                order_by += "d.created_at DESC, d.id DESC"
+            
+            # Combine query
+            if where_conditions:
+                query = base_query + " WHERE " + " AND ".join(where_conditions) + " " + order_by
+            else:
+                query = base_query + " " + order_by
+            
+            cur.execute(query, params)
+            deals = cur.fetchall()
+            cur.execute("SELECT id, name, slug FROM categories ORDER BY name ASC")
+            cats = cur.fetchall()
+            
+            # Get deal of the day
+            deal_of_the_day = get_deal_of_the_day()
+            
+            return render_template('home.html', deals=deals, categories=cats, 
+                                 search=search, sort_by=sort_by, max_price=max_price,
+                                 deal_of_the_day=deal_of_the_day)
+        finally:
+            cur.close()
+            return_db_connection(conn)
+    except Exception as e:
+        error_msg = str(e)
+        if 'DATABASE_URL' in error_msg:
+            return f'''
+            <html>
+            <head><title>Configuration Error</title></head>
+            <body style="font-family: Arial; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h1>⚠️ Database Configuration Required</h1>
+                <p>The <code>DATABASE_URL</code> environment variable is not set.</p>
+                <h2>How to Fix:</h2>
+                <ol>
+                    <li>Go to your <strong>Supabase Dashboard</strong></li>
+                    <li>Navigate to <strong>Settings → Database</strong></li>
+                    <li>Copy the <strong>Connection string (URI)</strong></li>
+                    <li>Go to <strong>Vercel Dashboard → Your Project → Settings → Environment Variables</strong></li>
+                    <li>Add a new variable: <code>DATABASE_URL</code> with your connection string</li>
+                    <li>Redeploy your application</li>
+                </ol>
+                <p><strong>Error Details:</strong></p>
+                <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">{error_msg}</pre>
+            </body>
+            </html>
+            ''', 500
         else:
-            query = base_query + " " + order_by
-        
-        cur.execute(query, params)
-        deals = cur.fetchall()
-        cur.execute("SELECT id, name, slug FROM categories ORDER BY name ASC")
-        cats = cur.fetchall()
-        
-        # Get deal of the day
-        deal_of_the_day = get_deal_of_the_day()
-        
-        return render_template('home.html', deals=deals, categories=cats, 
-                             search=search, sort_by=sort_by, max_price=max_price,
-                             deal_of_the_day=deal_of_the_day)
-    finally:
-        cur.close()
-        return_db_connection(conn)
+            return f'''
+            <html>
+            <head><title>Database Error</title></head>
+            <body style="font-family: Arial; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h1>Database Connection Error</h1>
+                <p>There was an error connecting to the database:</p>
+                <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">{error_msg}</pre>
+                <p>Please check your DATABASE_URL configuration in Vercel.</p>
+            </body>
+            </html>
+            ''', 500
 
 @app.route('/category/<slug>')
 def category_page(slug):
