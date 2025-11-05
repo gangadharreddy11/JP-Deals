@@ -149,6 +149,26 @@ def get_deal_of_the_day():
         print(f"Error getting deal of the day: {e}")
         return None
 
+@app.route('/health')
+def health_check():
+    """Health check endpoint that doesn't require database"""
+    try:
+        db_status = "Available" if DATABASE_AVAILABLE else f"Not Available: {DATABASE_ERROR}"
+        db_url_set = "Yes" if os.environ.get('DATABASE_URL') else "No"
+        
+        return jsonify({
+            "status": "ok",
+            "database_available": DATABASE_AVAILABLE,
+            "database_url_set": db_url_set,
+            "database_status": db_status,
+            "vercel": IS_VERCEL
+        }), 200
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
 @app.route('/')
 def home():
     try:
