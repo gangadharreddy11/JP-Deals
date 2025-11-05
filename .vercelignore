@@ -1,0 +1,25 @@
+# Ignore virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Ignore local database (will be recreated on Vercel)
+*.db
+*.db-journal
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore local uploads (Vercel uses /tmp)
+jp_dealswebsite/static/uploads/*
+

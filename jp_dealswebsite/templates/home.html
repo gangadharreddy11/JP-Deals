@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jp_deals11 - Best Deals & Offers</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='uploads/deals.css') }}">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.jpg') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <nav>
+                <div class="logo">🛍️ DailyDeals</div>
+                
+                <div class="search-bar">
+                    <input type="text" id="searchInput" placeholder="Search for deals, products, brands..." value="{{ search or '' }}">
+                    <button onclick="searchDeals()">Search</button>
+                </div>
+                
+                <div class="nav-actions">
+                    <div class="nav-btn" onclick="alert('Wishlist feature coming soon!')">❤️ Wishlist</div>
+                    <!-- <a href="https://faym.co/i/gfs_deals" target="_blank" class="nav-btn">❤️ Wishlist</a> -->
+
+                    <!-- <div class="nav-btn" onclick="window.open('https://faym.co/i/gfs_deals1', '_blank')">❤️ Wishlist</div> -->
+                    {% if session.get('admin_logged_in') %}
+                    <div class="nav-btn" onclick="window.location.href='/admin'">Admin</div>
+                    {% endif %}
+                </div>
+            </nav>
+        </div>
+    </header>
+    
+    <!-- Categories -->
+    <div class="categories-bar">
+        <div class="container">
+            <ul class="categories" id="categories">
+                <li class="category-item active" onclick="filterByCategory('all')">All Deals</li>
+                {% for cat in categories %}
+                <li class="category-item" onclick="filterByCategory('{{ cat[2] }}')">{{ cat[1] }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    
+    <!-- Main Content -->
+    <div class="container">
+        <!-- Deal of the Day Banner -->
+        {% if deal_of_the_day %}
+        <div class="deal-banner">
+            <img src="{% if deal_of_the_day.image_filename %}{{ url_for('static', filename='uploads/' + deal_of_the_day.image_filename) }}{% else %}https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500{% endif %}" alt="{{ deal_of_the_day.title }}" class="deal-banner-img">
+            <div class="deal-banner-content">
+                <div class="deal-badge">⚡ DEAL OF THE DAY</div>
+                <h2>{{ deal_of_the_day.title }}</h2>
+                <p>{{ deal_of_the_day.description or 'Amazing deal you don\'t want to miss!' }}</p>
+                <div class="deal-banner-price">
+                    <span class="price-current">₹{{ "%.0f"|format(deal_of_the_day.price) }}</span>
+                    {% if deal_of_the_day.original_price and deal_of_the_day.original_price > deal_of_the_day.price %}
+                    <span class="price-original">₹{{ "%.0f"|format(deal_of_the_day.original_price) }}</span>
+                    {% endif %}
+                    {% if deal_of_the_day.discount %}
+                    <span class="discount-tag">{{ deal_of_the_day.discount }}% OFF</span>
+                    {% endif %}
+                </div>
+                <button class="btn-primary" onclick="trackClick({{ deal_of_the_day.id }}, '{{ deal_of_the_day.url|e }}', event)">Grab This Deal Now! →</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="deal-banner">
+            <img src="https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500" alt="Deal of the Day" class="deal-banner-img">
+            <div class="deal-banner-content">
+                <div class="deal-badge">⚡ DEAL OF THE DAY</div>
+                <h2>Premium Wireless Headphones</h2>
+                <p>High-quality sound, noise cancellation, 30-hour battery life</p>
+                <div class="deal-banner-price">
+                    <span class="price-current">₹2,999</span>
+                    <span class="price-original">₹8,999</span>
+                    <span class="discount-tag">67% OFF</span>
+                </div>
+                <button class="btn-primary" onclick="alert('No deal of the day set. Admin can add one from the admin panel.')">Grab This Deal Now! →</button>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+            <div class="filter-item">
+                <label>Sort by:</label>
+                <select onchange="sortDeals(this.value)">
+                    <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest First</option>
+                    <option value="discount" {% if sort_by == 'discount' %}selected{% endif %}>Highest Discount</option>
+                    <option value="price-low" {% if sort_by == 'price-low' %}selected{% endif %}>Price: Low to High</option>
+                    <option value="price-high" {% if sort_by == 'price-high' %}selected{% endif %}>Price: High to Low</option>
+                </select>
+            </div>
+            <div class="filter-item">
+                <label>Max Price:</label>
+                <select onchange="filterByPrice(this.value)">
+                    <option value="all" {% if not max_price %}selected{% endif %}>All Prices</option>
+                    <option value="1000" {% if max_price == '1000' %}selected{% endif %}>Under ₹1,000</option>
+                    <option value="5000" {% if max_price == '5000' %}selected{% endif %}>Under ₹5,000</option>
+                    <option value="10000" {% if max_price == '10000' %}selected{% endif %}>Under ₹10,000</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Hot Deals Section -->
+        <h2 class="section-title">🔥 Hot Deals Today</h2>
+        
+        <div class="deals-grid" id="dealsGrid">
+            {% for deal in deals %}
+            <div class="deal-card" data-category="{{ deal[8] or 'electronics' }}">
+                <img src="{% if deal[6] %}{{ url_for('static', filename='uploads/' + deal[6]) }}{% else %}https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400{% endif %}" alt="{{ deal[1] }}" class="deal-image">
+                <div class="deal-content">
+                    <div class="deal-title">{{ deal[1] }}</div>
+                    <div class="deal-meta">
+                        <div class="deal-price">
+                            <span class="price-now">₹{{ "%.0f"|format(deal[3]) }}</span>
+                            {% if deal[4] and deal[4] > deal[3] %}
+                            <span class="price-was">₹{{ "%.0f"|format(deal[4]) }}</span>
+                            {% endif %}
+                        </div>
+                        {% if deal[5] %}
+                        <span class="discount-badge">{{ deal[5] }}% OFF</span>
+                        {% endif %}
+                    </div>
+                    <div class="deal-footer">
+                        <span class="category-tag">{{ deal[8] or 'Uncategorized' }}</span>
+                        <button class="wishlist-btn" onclick="toggleWishlist({{ deal[0] }}, event)">🤍</button>
+                    </div>
+                    <button class="btn-buy" onclick="trackClick({{ deal[0] }}, '{{ deal[2]|e }}', event)">Buy Now</button>
+                </div>
+            </div>
+            {% else %}
+            <p>No deals available yet. <a href="/admin">Add some deals</a>!</p>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p><strong>DailyDeals</strong> - Your Ultimate Deals Destination</p>
+            <p>© 2025 DailyDeals. All rights reserved.</p>
+            <p style="font-size: 0.9rem; margin-top: 1rem; opacity: 0.8;">
+                Affiliate Disclosure: We may earn commissions from purchases made through our links at no extra cost to you.
+            </p>
+        </div>
+    </footer>
+    <script src="{{ url_for('static', filename='uploads/deals.js') }}"></script>
+</body>
+</html>

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Panel - DailyDeals</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='uploads/deals.css') }}">
+    <style>
+        .admin-container { 
+            max-width: 1200px; 
+            margin: 0 auto; 
+            padding: 2rem; 
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+        .admin-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        .admin-grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 2rem; 
+            margin-bottom: 2rem; 
+        }
+        .admin-section { 
+            background: white; 
+            padding: 2rem; 
+            border-radius: 10px; 
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1); 
+        }
+        .form-group { 
+            margin-bottom: 1rem; 
+        }
+        .form-group label { 
+            display: block; 
+            margin-bottom: 0.5rem; 
+            font-weight: 600; 
+            color: #333;
+        }
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; 
+            padding: 0.75rem; 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            font-size: 1rem;
+        }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+        .btn-submit { 
+            background: #667eea; 
+            color: white; 
+            padding: 0.75rem 1.5rem; 
+            border: none; 
+            border-radius: 5px; 
+            cursor: pointer; 
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+        .btn-submit:hover { 
+            background: #5568d3; 
+            transform: translateY(-1px);
+        }
+        .categories-list { 
+            list-style: none; 
+            padding: 0; 
+        }
+        .categories-list li { 
+            padding: 0.75rem; 
+            background: #f8f9fa; 
+            margin: 0.5rem 0; 
+            border-radius: 5px; 
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .deals-table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 1rem; 
+        }
+        .deals-table th, .deals-table td { 
+            padding: 0.75rem; 
+            border: 1px solid #ddd; 
+            text-align: left; 
+        }
+        .deals-table th { 
+            background: #f8f9fa; 
+            font-weight: 600;
+        }
+        .deals-table tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+        .deal-image-preview {
+            width: 50px;
+            height: 50px;
+            object-fit: cover;
+            border-radius: 5px;
+        }
+        .back-btn {
+            background: #6c757d;
+            color: white;
+            padding: 0.5rem 1rem;
+            text-decoration: none;
+            border-radius: 5px;
+            display: inline-block;
+            margin-bottom: 1rem;
+        }
+        .back-btn:hover {
+            background: #5a6268;
+            color: white;
+            text-decoration: none;
+        }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            border: 1px solid #c3e6cb;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            border: 1px solid #f5c6cb;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="admin-header">
+            <h1>🛍️ DailyDeals Admin Panel</h1>
+            <p>Manage your deals and categories</p>
+        </div>
+        
+        <a href="/" class="back-btn">← Back to Site</a>
+        <a href="{{ url_for('admin_logout') }}" class="back-btn" style="background: #dc3545; margin-left: 1rem;">Logout</a>
+        
+        <!-- Admin Navigation -->
+        <div class="admin-nav" style="margin: 2rem 0; display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="{{ url_for('admin_dashboard') }}" class="nav-btn" style="background: #667eea; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 5px;">Dashboard</a>
+            <a href="{{ url_for('admin_categories') }}" class="nav-btn" style="background: #28a745; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 5px;">Categories</a>
+            <a href="{{ url_for('admin_products') }}" class="nav-btn" style="background: #17a2b8; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 5px;">Products</a>
+            <a href="{{ url_for('admin_deals_of_the_day') }}" class="nav-btn" style="background: #ffc107; color: #333; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 5px;">Deals of the Day</a>
+            <a href="/add-sample-deals" class="nav-btn" style="background: #6f42c1; color: white; padding: 0.75rem 1.5rem; text-decoration: none; border-radius: 5px;">Add Sample Data</a>
+        </div>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}" style="padding: 1rem; border-radius: 5px; margin-bottom: 1rem; {% if category == 'success' %}background: #d4edda; color: #155724; border: 1px solid #c3e6cb;{% else %}background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;{% endif %}">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <div class="admin-grid">
+            <div class="admin-section">
+                <h2>📁 Add Category</h2>
+                <form method="post">
+                    <input type="hidden" name="form_type" value="category">
+                    <div class="form-group">
+                        <label for="name">Category Name</label>
+                        <input type="text" id="name" name="name" placeholder="Electronics" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="slug">Category Slug (URL friendly)</label>
+                        <input type="text" id="slug" name="slug" placeholder="electronics" required>
+                        <small style="color: #666;">This will be used in URLs (e.g., /category/electronics)</small>
+                    </div>
+                    <button type="submit" class="btn-submit">Add Category</button>
+                </form>
+                
+                <h3 style="margin-top: 2rem;">📋 Existing Categories</h3>
+                <ul class="categories-list">
+                    {% for cat in categories %}
+                    <li>
+                        <span><strong>{{ cat.name }}</strong> ({{ cat.slug }})</span>
+                        <span style="color: #666;">ID: {{ cat.id }}</span>
+                    </li>
+                    {% else %}
+                    <li>No categories yet</li>
+                    {% endfor %}
+                </ul>
+            </div>
+            
+            <div class="admin-section">
+                <h2>🛒 Add Deal</h2>
+                <form method="post" enctype="multipart/form-data">
+                    <input type="hidden" name="form_type" value="deal">
+                    <div class="form-group">
+                        <label for="title">Deal Title</label>
+                        <input type="text" id="title" name="title" placeholder="Apple iPhone 15 Pro Max" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="url">Affiliate Link (URL)</label>
+                        <input type="url" id="url" name="url" placeholder="https://amazon.in/dp/..." required>
+                        <small style="color: #666;">This is where users will be redirected when they click "Buy Now"</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="price">Current Price (₹)</label>
+                        <input type="number" id="price" name="price" step="0.01" min="0" placeholder="99999.00" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="original_price">Original Price (₹) - Optional</label>
+                        <input type="number" id="original_price" name="original_price" step="0.01" min="0" placeholder="129999.00">
+                        <small style="color: #666;">Leave empty if no original price</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="category_id">Category</label>
+                        <select id="category_id" name="category_id" required>
+                            <option value="">Select Category</option>
+                            {% for cat in categories %}
+                            <option value="{{ cat.id }}">{{ cat.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="image">Deal Image</label>
+                        <input type="file" id="image" name="image" accept="image/*">
+                        <small style="color: #666;">Upload an image for this deal (PNG, JPG, JPEG, GIF, WEBP)</small>
+                    </div>
+                    <button type="submit" class="btn-submit">Add Deal</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="admin-section">
+            <h2>📊 Recent Deals</h2>
+            <table class="deals-table">
+                <thead>
+                    <tr>
+                        <th>Image</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Price</th>
+                        <th>Original Price</th>
+                        <th>Discount</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for deal in deals %}
+                    <tr>
+                        <td>
+                            {% if deal.image_filename %}
+                                <img src="{{ url_for('static', filename='uploads/' + deal.image_filename) }}" alt="{{ deal.title }}" class="deal-image-preview">
+                            {% else %}
+                                <div style="width: 50px; height: 50px; background: #f0f0f0; border-radius: 5px; display: flex; align-items: center; justify-content: center; color: #999;">No Image</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ deal.title }}</td>
+                        <td>{{ deal.category_name or 'Uncategorized' }}</td>
+                        <td>₹{{ "%.2f"|format(deal.price) }}</td>
+                        <td>₹{{ "%.2f"|format(deal.original_price) if deal.original_price else '-' }}</td>
+                        <td>{{ deal.discount ~ '%' if deal.discount else '-' }}</td>
+                        <td>
+                            <a href="{{ deal.url }}" target="_blank" style="color: #667eea; text-decoration: none;">View Link</a>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="7" style="text-align: center; padding: 2rem;">No deals yet. Add some deals above!</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
