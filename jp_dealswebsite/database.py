@@ -34,11 +34,12 @@ def get_db_connection():
         raise Exception(f"psycopg2 not available: {PSYCOPG2_ERROR}. Make sure psycopg2-binary is installed.")
     
     # Get Supabase connection string from environment
-    database_url = os.environ.get('DATABASE_URL')
+    # Check DATABASE_URL1 first, then fall back to DATABASE_URL
+    database_url = os.environ.get('DATABASE_URL1') or os.environ.get('DATABASE_URL')
     
     if not database_url:
         raise Exception(
-            "DATABASE_URL environment variable is not set. "
+            "DATABASE_URL or DATABASE_URL1 environment variable is not set. "
             "Please set it in Vercel Dashboard → Settings → Environment Variables. "
             "Get your connection string from Supabase Dashboard → Settings → Database → Connection string (URI). "
             "⚠️ IMPORTANT: Use 'Session mode' or 'Transaction mode' (not Direct connection) for IPv4 compatibility!"

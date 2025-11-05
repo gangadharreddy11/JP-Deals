@@ -183,12 +183,16 @@ def health_check():
     """Health check endpoint that doesn't require database"""
     try:
         db_status = "Available" if DATABASE_AVAILABLE else f"Not Available: {DATABASE_ERROR}"
+        db_url1_set = "Yes" if os.environ.get('DATABASE_URL1') else "No"
         db_url_set = "Yes" if os.environ.get('DATABASE_URL') else "No"
+        db_url_used = "DATABASE_URL1" if os.environ.get('DATABASE_URL1') else ("DATABASE_URL" if os.environ.get('DATABASE_URL') else "None")
         
         return jsonify({
             "status": "ok",
             "database_available": DATABASE_AVAILABLE,
+            "database_url1_set": db_url1_set,
             "database_url_set": db_url_set,
+            "database_url_used": db_url_used,
             "database_status": db_status,
             "vercel": IS_VERCEL
         }), 200
