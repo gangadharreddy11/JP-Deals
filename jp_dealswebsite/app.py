@@ -14,7 +14,8 @@ IS_VERCEL = os.environ.get('VERCEL', '0') == '1' or os.environ.get('VERCEL_ENV')
 # Initialize Flask app with explicit template and static folders
 app = Flask(__name__, 
             template_folder=os.path.join(BASE_DIR, 'templates'),
-            static_folder=os.path.join(BASE_DIR, 'static'))
+            static_folder=os.path.join(BASE_DIR, 'static'),
+            static_url_path='/static')
 
 # Configuration
 app.secret_key = os.environ.get('SECRET_KEY', 'your-secret-key-here-change-in-production')
@@ -44,11 +45,17 @@ def ensure_upload_dir():
     except Exception as e:
         print(f"Warning: Could not create upload folder: {e}")
 
-if not IS_VERCEL:
-    try:
-        os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
-    except Exception as e:
-        print(f"Warning: Could not create static folder: {e}")
+# Ensure static directory exists (for both local and Vercel)
+try:
+    static_dir = os.path.join(BASE_DIR, 'static')
+    if not os.path.exists(static_dir):
+        os.makedirs(static_dir, exist_ok=True)
+    # Ensure static/uploads exists for uploads route
+    uploads_dir = os.path.join(static_dir, 'uploads')
+    if not os.path.exists(uploads_dir) and not IS_VERCEL:
+        os.makedirs(uploads_dir, exist_ok=True)
+except Exception as e:
+    print(f"Warning: Could not create static folder: {e}")
 
 # Initialize database flag (for Vercel)
 _db_initialized = False

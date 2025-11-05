@@ -20,10 +20,7 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Ignore local uploads (Vercel uses /tmp)
-# But keep essential CSS/JS files
-jp_dealswebsite/static/uploads/*.jpg
-jp_dealswebsite/static/uploads/*.jpeg
-jp_dealswebsite/static/uploads/*.png
-jp_dealswebsite/static/uploads/*.gif
+# Keep all static files - they're needed for the site
+# Only ignore uploaded user content images (will use /tmp on Vercel)
+# But CSS, JS, and essential images must be included
 
