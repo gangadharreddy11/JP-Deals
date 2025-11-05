@@ -46,19 +46,36 @@ def ensure_upload_dir():
         print(f"Warning: Could not create upload folder: {e}")
 
 # Ensure static directory exists (for both local and Vercel)
-try:
-    static_dir = os.path.join(BASE_DIR, 'static')
-    if not os.path.exists(static_dir):
-        os.makedirs(static_dir, exist_ok=True)
-    # Ensure static/uploads exists for uploads route
-    uploads_dir = os.path.join(static_dir, 'uploads')
-    if not os.path.exists(uploads_dir) and not IS_VERCEL:
-        os.makedirs(uploads_dir, exist_ok=True)
-except Exception as e:
-    print(f"Warning: Could not create static folder: {e}")
+# Make this lazy to avoid errors during import
+def ensure_static_dirs():
+    try:
+        static_dir = os.path.join(BASE_DIR, 'static')
+        if not os.path.exists(static_dir):
+            os.makedirs(static_dir, exist_ok=True)
+        # Ensure static/uploads exists for uploads route
+        uploads_dir = os.path.join(static_dir, 'uploads')
+        if not os.path.exists(uploads_dir) and not IS_VERCEL:
+            os.makedirs(uploads_dir, exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create static folder: {e}")
+
+# Only create static dirs on Vercel if they don't exist (avoid errors)
+if IS_VERCEL:
+    try:
+        static_dir = os.path.join(BASE_DIR, 'static')
+        if not os.path.exists(static_dir):
+            # On Vercel, static files should already be deployed
+            # Just ensure we don't crash if they don't exist
+            pass
+    except:
+        pass
+else:
+    ensure_static_dirs()
 
 # Initialize database flag (for Vercel)
+# Don't initialize during import - do it lazily on first request
 _db_initialized = False
+_db_init_lock = False
 
 def get_db():
     global _db_initialized
