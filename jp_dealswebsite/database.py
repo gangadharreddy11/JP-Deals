@@ -1,0 +1,122 @@
+"""
+Database connection module for Supabase PostgreSQL
+"""
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from psycopg2 import pool
+
+# Database connection pool
+_connection_pool = None
+
+def get_db_connection():
+    """Get a database connection from the pool"""
+    global _connection_pool
+    
+    if _connection_pool is None:
+        # Get Supabase connection string from environment
+        database_url = os.environ.get('DATABASE_URL')
+        
+        if not database_url:
+            raise Exception("DATABASE_URL environment variable is not set")
+        
+        # Create connection pool
+        _connection_pool = psycopg2.pool.SimpleConnectionPool(
+            1,  # min connections
+            10,  # max connections
+            database_url
+        )
+    
+    return _connection_pool.getconn()
+
+def return_db_connection(conn):
+    """Return a connection to the pool"""
+    global _connection_pool
+    if _connection_pool:
+        _connection_pool.putconn(conn)
+
+def get_db():
+    """Get a database cursor with dict-like rows"""
+    conn = get_db_connection()
+    conn.autocommit = False
+    return conn, conn.cursor(cursor_factory=RealDictCursor)
+
+def init_db():
+    """Initialize database tables"""
+    conn, cur = get_db()
+    
+    try:
+        # Create categories table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS categories (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                slug TEXT NOT NULL UNIQUE,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # Create deals table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS deals (
+                id SERIAL PRIMARY KEY,
+                title TEXT NOT NULL,
+                url TEXT NOT NULL,
+                price REAL NOT NULL,
+                original_price REAL,
+                discount INTEGER,
+                image_filename TEXT,
+                category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
+                description TEXT,
+                stock_quantity INTEGER DEFAULT 0,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # Create deal_of_the_day table
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS deal_of_the_day (
+                id SERIAL PRIMARY KEY,
+                deal_id INTEGER NOT NULL REFERENCES deals(id) ON DELETE CASCADE,
+                start_date DATE NOT NULL,
+                end_date DATE,
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        # Check if default categories exist
+        cur.execute("SELECT COUNT(*) FROM categories")
+        count = cur.fetchone()['count']
+        
+        if count == 0:
+            # Insert default categories
+            default_categories = [
+                ('Electronics', 'electronics'),
+                ('Fashion', 'fashion'),
+                ('Home & Kitchen', 'home'),
+                ('Beauty', 'beauty'),
+                ('Books', 'books'),
+                ('Sports', 'sports')
+            ]
+            
+            for name, slug in default_categories:
+                cur.execute(
+                    "INSERT INTO categories(name, slug) VALUES(%s, %s) ON CONFLICT (name) DO NOTHING",
+                    (name, slug)
+                )
+        
+        conn.commit()
+        print("Database initialized successfully!")
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Error initializing database: {e}")
+        raise
+    finally:
+        cur.close()
+        return_db_connection(conn)
+
