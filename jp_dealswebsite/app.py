@@ -36,11 +36,13 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
-# Ensure upload directory exists
-try:
-    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-except Exception as e:
-    print(f"Warning: Could not create upload folder: {e}")
+# Ensure upload directory exists (lazy initialization to avoid errors during import)
+# This will be created on first use, not during import
+def ensure_upload_dir():
+    try:
+        os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create upload folder: {e}")
 
 if not IS_VERCEL:
     try:
@@ -88,7 +90,13 @@ def get_db():
 
 def init_db():
     try:
-        con = sqlite3.connect(app.config['DATABASE'])
+        # Ensure database directory exists
+        db_path = app.config['DATABASE']
+        db_dir = os.path.dirname(db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir, exist_ok=True)
+        
+        con = sqlite3.connect(db_path)
         con.execute('PRAGMA foreign_keys = ON;')
         
         # Drop and recreate tables to ensure proper schema
@@ -418,6 +426,7 @@ def admin_dashboard():
                 if 'image' in request.files:
                     file = request.files['image']
                     if file and file.filename and allowed_file(file.filename):
+                        ensure_upload_dir()  # Ensure directory exists
                         filename = secure_filename(file.filename)
                         # Add timestamp to make filename unique
                         name, ext = os.path.splitext(filename)
