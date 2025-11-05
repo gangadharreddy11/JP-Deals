@@ -4,14 +4,43 @@ from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort, jsonify, flash, session
 from werkzeug.utils import secure_filename
 
-# Try to import database module, but don't fail if it doesn't work
+# Try to load .env file for local development
 try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # python-dotenv not installed, that's fine
+    pass
+
+# Try to import database module, but don't fail if it doesn't work
+# Try absolute import first (for Vercel), then relative import (for local)
+DATABASE_AVAILABLE = False
+DATABASE_ERROR = None
+
+try:
+    # Try absolute import first (works on Vercel)
     from jp_dealswebsite.database import get_db, init_db, return_db_connection
     DATABASE_AVAILABLE = True
+except ImportError:
+    try:
+        # Try relative import (works when running locally from jp_dealswebsite directory)
+        from database import get_db, init_db, return_db_connection
+        DATABASE_AVAILABLE = True
+    except ImportError as e:
+        DATABASE_AVAILABLE = False
+        DATABASE_ERROR = str(e)
+        print(f"Warning: Database module not available: {e}")
+        # Create stub functions to prevent crashes
+        def get_db():
+            raise Exception(f"Database not available: {DATABASE_ERROR}")
+        def init_db():
+            raise Exception(f"Database not available: {DATABASE_ERROR}")
+        def return_db_connection(conn):
+            pass
 except Exception as e:
     DATABASE_AVAILABLE = False
     DATABASE_ERROR = str(e)
-    print(f"Warning: Database module not available: {e}")
+    print(f"Warning: Database module error: {e}")
     # Create stub functions to prevent crashes
     def get_db():
         raise Exception(f"Database not available: {DATABASE_ERROR}")
@@ -919,5 +948,15 @@ def add_sample_deals():
 if __name__ == '__main__':
     # Only initialize database on local run, not on Vercel
     if not IS_VERCEL:
-        init_db()
+        try:
+            if DATABASE_AVAILABLE:
+                init_db()
+            else:
+                print(f"Warning: Database not available: {DATABASE_ERROR}")
+                print("The app will run but database features won't work.")
+        except Exception as e:
+            print(f"Warning: Could not initialize database: {e}")
+            print("The app will run but database features won't work.")
+    
+    print("Starting Flask app on http://0.0.0.0:5000")
     app.run(host='0.0.0.0', port=5000, debug=True)

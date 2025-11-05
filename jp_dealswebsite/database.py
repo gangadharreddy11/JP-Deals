@@ -40,7 +40,8 @@ def get_db_connection():
         raise Exception(
             "DATABASE_URL environment variable is not set. "
             "Please set it in Vercel Dashboard → Settings → Environment Variables. "
-            "Get your connection string from Supabase Dashboard → Settings → Database → Connection string (URI)"
+            "Get your connection string from Supabase Dashboard → Settings → Database → Connection string (URI). "
+            "⚠️ IMPORTANT: Use 'Session mode' or 'Transaction mode' (not Direct connection) for IPv4 compatibility!"
         )
     
     # Create connection pool if it doesn't exist
@@ -52,6 +53,14 @@ def get_db_connection():
                 database_url
             )
         except Exception as e:
+            error_msg = str(e)
+            # Provide helpful error message for IPv4 issues
+            if 'could not translate host name' in error_msg.lower() or 'name resolution' in error_msg.lower():
+                raise Exception(
+                    f"Connection failed: {error_msg}. "
+                    "⚠️ This usually means you're using 'Direct connection' which is IPv6-only. "
+                    "Use 'Session mode' or 'Transaction mode' connection string from Supabase instead!"
+                )
             raise Exception(f"Failed to connect to database: {str(e)}. Please check your DATABASE_URL.")
     
     try:
@@ -152,4 +161,3 @@ def init_db():
     finally:
         cur.close()
         return_db_connection(conn)
-
