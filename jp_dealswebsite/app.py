@@ -8,7 +8,8 @@ from werkzeug.utils import secure_filename
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
 # Detect if running on Vercel
-IS_VERCEL = os.environ.get('VERCEL', '0') == '1'
+# Vercel sets VERCEL=1, but also check for other indicators
+IS_VERCEL = os.environ.get('VERCEL', '0') == '1' or os.environ.get('VERCEL_ENV') is not None
 
 # Initialize Flask app with explicit template and static folders
 app = Flask(__name__, 
@@ -36,9 +37,16 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # Ensure upload directory exists
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except Exception as e:
+    print(f"Warning: Could not create upload folder: {e}")
+
 if not IS_VERCEL:
-    os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
+    try:
+        os.makedirs(os.path.join(BASE_DIR, 'static'), exist_ok=True)
+    except Exception as e:
+        print(f"Warning: Could not create static folder: {e}")
 
 # Initialize database flag (for Vercel)
 _db_initialized = False
@@ -48,13 +56,35 @@ def get_db():
     # Initialize database on first request if needed (especially for Vercel)
     if not _db_initialized:
         try:
+            # Ensure database directory exists
+            db_dir = os.path.dirname(app.config['DATABASE'])
+            if db_dir and not os.path.exists(db_dir):
+                os.makedirs(db_dir, exist_ok=True)
+            
             # Check if database exists
             if not os.path.exists(app.config['DATABASE']):
                 init_db()
+            else:
+                # Just verify it's accessible
+                test_con = sqlite3.connect(app.config['DATABASE'])
+                test_con.close()
             _db_initialized = True
         except Exception as e:
+            # Log error but don't fail - let the actual connection attempt handle it
+            import traceback
             print(f"Warning: Database initialization error: {e}")
-    return sqlite3.connect(app.config['DATABASE'])
+            print(traceback.format_exc())
+    try:
+        return sqlite3.connect(app.config['DATABASE'])
+    except Exception as e:
+        # If connection fails, try to recreate database
+        try:
+            if os.path.exists(app.config['DATABASE']):
+                os.remove(app.config['DATABASE'])
+            init_db()
+            return sqlite3.connect(app.config['DATABASE'])
+        except Exception as e2:
+            raise Exception(f"Database connection failed: {e}, recovery failed: {e2}")
 
 def init_db():
     try:
