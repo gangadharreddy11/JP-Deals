@@ -21,5 +21,9 @@ __pycache__/
 Thumbs.db
 
 # Ignore local uploads (Vercel uses /tmp)
-jp_dealswebsite/static/uploads/*
+# But keep essential CSS/JS files
+jp_dealswebsite/static/uploads/*.jpg
+jp_dealswebsite/static/uploads/*.jpeg
+jp_dealswebsite/static/uploads/*.png
+jp_dealswebsite/static/uploads/*.gif
 
