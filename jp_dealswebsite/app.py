@@ -3,7 +3,22 @@ import time
 from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory, abort, jsonify, flash, session
 from werkzeug.utils import secure_filename
-from jp_dealswebsite.database import get_db, init_db, return_db_connection
+
+# Try to import database module, but don't fail if it doesn't work
+try:
+    from jp_dealswebsite.database import get_db, init_db, return_db_connection
+    DATABASE_AVAILABLE = True
+except Exception as e:
+    DATABASE_AVAILABLE = False
+    DATABASE_ERROR = str(e)
+    print(f"Warning: Database module not available: {e}")
+    # Create stub functions to prevent crashes
+    def get_db():
+        raise Exception(f"Database not available: {DATABASE_ERROR}")
+    def init_db():
+        raise Exception(f"Database not available: {DATABASE_ERROR}")
+    def return_db_connection(conn):
+        pass
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
@@ -76,6 +91,8 @@ _db_initialized = False
 def ensure_db_initialized():
     """Ensure database is initialized (lazy initialization)"""
     global _db_initialized
+    if not DATABASE_AVAILABLE:
+        raise Exception(f"Database not available: {DATABASE_ERROR}")
     if not _db_initialized:
         try:
             init_db()
@@ -135,6 +152,29 @@ def get_deal_of_the_day():
 @app.route('/')
 def home():
     try:
+        if not DATABASE_AVAILABLE:
+            error_msg = f"Database module not available: {DATABASE_ERROR}"
+            return f'''
+            <html>
+            <head><title>Configuration Error</title></head>
+            <body style="font-family: Arial; padding: 40px; max-width: 800px; margin: 0 auto;">
+                <h1>⚠️ Database Configuration Required</h1>
+                <p>The database module could not be loaded.</p>
+                <h2>How to Fix:</h2>
+                <ol>
+                    <li>Go to your <strong>Supabase Dashboard</strong></li>
+                    <li>Navigate to <strong>Settings → Database</strong></li>
+                    <li>Copy the <strong>Connection string (URI)</strong></li>
+                    <li>Go to <strong>Vercel Dashboard → Your Project → Settings → Environment Variables</strong></li>
+                    <li>Add a new variable: <code>DATABASE_URL</code> with your connection string</li>
+                    <li>Redeploy your application</li>
+                </ol>
+                <p><strong>Error Details:</strong></p>
+                <pre style="background: #f5f5f5; padding: 15px; border-radius: 5px; overflow-x: auto;">{error_msg}</pre>
+            </body>
+            </html>
+            ''', 500
+        
         ensure_db_initialized()
         conn, cur = get_db()
         
@@ -196,7 +236,7 @@ def home():
             return_db_connection(conn)
     except Exception as e:
         error_msg = str(e)
-        if 'DATABASE_URL' in error_msg:
+        if 'DATABASE_URL' in error_msg or 'not available' in error_msg.lower():
             return f'''
             <html>
             <head><title>Configuration Error</title></head>

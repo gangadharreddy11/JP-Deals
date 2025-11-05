@@ -2,9 +2,26 @@
 Database connection module for Supabase PostgreSQL
 """
 import os
-import psycopg2
-from psycopg2.extras import RealDictCursor
-from psycopg2 import pool
+
+# Try to import psycopg2, but handle gracefully if it fails
+try:
+    import psycopg2
+    from psycopg2.extras import RealDictCursor
+    from psycopg2 import pool
+    PSYCOPG2_AVAILABLE = True
+except ImportError as e:
+    PSYCOPG2_AVAILABLE = False
+    PSYCOPG2_ERROR = str(e)
+    print(f"Warning: psycopg2 not available: {e}")
+    # Create stub classes to prevent crashes
+    class psycopg2:
+        class pool:
+            @staticmethod
+            def SimpleConnectionPool(*args, **kwargs):
+                raise Exception(f"psycopg2 not available: {PSYCOPG2_ERROR}")
+        class extras:
+            class RealDictCursor:
+                pass
 
 # Database connection pool
 _connection_pool = None
@@ -12,6 +29,9 @@ _connection_pool = None
 def get_db_connection():
     """Get a database connection from the pool"""
     global _connection_pool
+    
+    if not PSYCOPG2_AVAILABLE:
+        raise Exception(f"psycopg2 not available: {PSYCOPG2_ERROR}. Make sure psycopg2-binary is installed.")
     
     # Get Supabase connection string from environment
     database_url = os.environ.get('DATABASE_URL')
